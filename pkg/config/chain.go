@@ -8,7 +8,7 @@ import (
 	_ "embed"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethersphere/go-storage-incentives-abi/abi"
+	"github.com/darkobas2/go-storage-incentives-abi/abi"
 )
 
 // TODO: consider adding BzzAddress (also as a cmd param) to the ChainConfig and remove the postagecontract.LookupERC20Address function.
@@ -64,8 +64,8 @@ var (
 		StakingAddress:         common.HexToAddress(abi.MainnetStakingAddress),
 		PostageStampAddress:    common.HexToAddress(abi.MainnetPostageStampStampAddress),
 		RedistributionAddress:  common.HexToAddress(abi.MainnetRedistributionAddress),
-		SwapPriceOracleAddress: common.HexToAddress("0x0FDc5429C50e2a39066D8A94F3e2D2476fcc3b85"),
-		CurrentFactoryAddress:  common.HexToAddress("0xc2d5a532cf69aa9a1378737d8ccdef884b6e7420"),
+		SwapPriceOracleAddress: common.HexToAddress("0x2411496aCc1e2F875D85870F1DE3B5419D7cA5fD"),
+		CurrentFactoryAddress:  common.HexToAddress("0xa396CDaD9F09783140845E337DbC55A24cC07c02"),
 
 		StakingABI:        abi.MainnetStakingABI,
 		PostageStampABI:   abi.MainnetPostageStampStampABI,
