@@ -33,35 +33,44 @@ type Backend interface {
 	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
 	FilterLogs(ctx context.Context, query ethereum.FilterQuery) ([]types.Log, error)
 	ChainID(ctx context.Context) (*big.Int, error)
+	SyncProgress(ctx context.Context) (*ethereum.SyncProgress, error)
 
 	Close()
 }
 
-// IsSynced will check if we are synced with the given blockchain backend. This
-// is true if the current wall clock is after the block time of last block
-// with the given maxDelay as the maximum duration we can be behind the block
-// time.
 func IsSynced(ctx context.Context, backend Backend, maxDelay time.Duration) (bool, time.Time, error) {
-	number, err := backend.BlockNumber(ctx)
-	if err != nil {
-		return false, time.Time{}, err
-	}
-	header, err := backend.HeaderByNumber(ctx, big.NewInt(int64(number)))
-	if errors.Is(err, ethereum.NotFound) {
-		return false, time.Time{}, nil
-	}
+	syncProgress, err := backend.SyncProgress(ctx)
 	if err != nil {
 		return false, time.Time{}, err
 	}
 
-	blockTime := time.Unix(int64(header.Time), 0)
+	if syncProgress == nil {
+		// Blockchain is fully synced
+		// Get the block details to retrieve the timestamp
+		blockNumber, err := backend.BlockNumber(ctx)
+		if err != nil {
+			return false, time.Time{}, err
+		}
+		header, err := backend.HeaderByNumber(ctx, big.NewInt(int64(blockNumber)))
+		if err != nil {
+			return false, time.Time{}, err
+		}
 
-	return blockTime.After(time.Now().UTC().Add(-maxDelay)), blockTime, nil
+		blockTime := time.Unix(int64(header.Time), 0)
+		return true, blockTime, nil
+	} else {
+		// Blockchain is still syncing
+		// Get the block details to retrieve the timestamp
+		header, err := backend.HeaderByNumber(ctx, big.NewInt(int64(syncProgress.CurrentBlock)))
+		if err != nil {
+			return false, time.Time{}, err
+		}
+
+		blockTime := time.Unix(int64(header.Time), 0)
+		return false, blockTime, nil
+	}
 }
 
-// WaitSynced will wait until we are synced with the given blockchain backend,
-// with the given maxDelay duration as the maximum time we can be behind the
-// last block.
 func WaitSynced(ctx context.Context, logger log.Logger, backend Backend, maxDelay time.Duration) error {
 	logger = logger.WithName(loggerName).Register()
 
