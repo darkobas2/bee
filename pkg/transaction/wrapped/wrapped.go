@@ -202,6 +202,10 @@ func (b *wrappedBackend) ChainID(ctx context.Context) (*big.Int, error) {
 	return chainID, nil
 }
 
+func (b *wrappedBackend) SyncProgress(ctx context.Context) (*ethereum.SyncProgress, error) {
+        return nil, nil
+}
+
 func (b *wrappedBackend) Close() {
 	b.backend.Close()
 }

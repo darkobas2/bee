@@ -141,6 +141,10 @@ func (m *backendMock) ChainID(ctx context.Context) (*big.Int, error) {
 	return nil, errors.New("not implemented")
 }
 
+func (m *backendMock) SyncProgress(ctx context.Context) (*ethereum.SyncProgress, error) {
+        return nil, errors.New("not implemented")
+}
+
 func (m *backendMock) Close() {
 }
 
