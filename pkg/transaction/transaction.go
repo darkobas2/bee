@@ -333,7 +333,7 @@ func (t *transactionService) suggestedFeeAndTip(ctx context.Context, gasPrice *b
 		gasPrice = new(big.Int).Div(new(big.Int).Mul(big.NewInt(int64(boostPercent)+100), gasPrice), big.NewInt(100))
 	}
 
-	gasTipCap, err := t.backend.SuggestGasTipCap(ctx)
+	gasTipCap, err := new(big.Int).SetUint64(2999999993), nil
 	if err != nil {
 		return nil, nil, err
 	}
