@@ -17,7 +17,7 @@ import (
 	"github.com/ethersphere/bee/pkg/swarm"
 	"github.com/ethersphere/bee/pkg/transaction"
 	"github.com/ethersphere/bee/pkg/util/abiutil"
-	"github.com/ethersphere/go-sw3-abi/sw3abi"
+	"github.com/darkobas2/go-sw3-abi/sw3abi"
 )
 
 var (

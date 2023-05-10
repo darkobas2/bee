@@ -64,8 +64,8 @@ var (
 		StakingAddress:         common.HexToAddress(abi.MainnetStakingAddress),
 		PostageStampAddress:    common.HexToAddress(abi.MainnetPostageStampStampAddress),
 		RedistributionAddress:  common.HexToAddress(abi.MainnetRedistributionAddress),
-		SwapPriceOracleAddress: common.HexToAddress("0x2411496aCc1e2F875D85870F1DE3B5419D7cA5fD"),
-		CurrentFactoryAddress:  common.HexToAddress("0xa396CDaD9F09783140845E337DbC55A24cC07c02"),
+		SwapPriceOracleAddress: common.HexToAddress(abi.MainnetPriceOracleAddress),
+		CurrentFactoryAddress:  common.HexToAddress(abi.MainnetFactoryAddress),
 
 		StakingABI:        abi.MainnetStakingABI,
 		PostageStampABI:   abi.MainnetPostageStampStampABI,
