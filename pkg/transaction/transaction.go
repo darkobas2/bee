@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethersphere/bee/pkg/crypto"
 	"github.com/ethersphere/bee/pkg/log"
-	"github.com/ethersphere/bee/pkg/sctx"
 	"github.com/ethersphere/bee/pkg/storage"
 	"golang.org/x/net/context"
 )
@@ -40,7 +39,9 @@ var (
 	ErrAlreadyImported     = errors.New("already imported")
 )
 
-const DefaultTipBoostPercent = 20
+// minGasPrice determines the minimum gas price
+// threshold (in wei) for the creation of a transaction.
+var minGasPrice = big.NewInt(1000)
 
 // TxRequest describes a request for a transaction that can be executed.
 type TxRequest struct {
@@ -73,7 +74,7 @@ type StoredTransaction struct {
 type Service interface {
 	io.Closer
 	// Send creates a transaction based on the request (with gasprice increased by provided percentage) and sends it.
-	Send(ctx context.Context, request *TxRequest, tipCapBoostPercent int) (txHash common.Hash, err error)
+	Send(ctx context.Context, request *TxRequest, priceBoostPercent int) (txHash common.Hash, err error)
 	// Call simulate a transaction based on the request.
 	Call(ctx context.Context, request *TxRequest) (result []byte, err error)
 	// WaitForReceipt waits until either the transaction with the given hash has been mined or the context is cancelled.
@@ -293,22 +294,14 @@ func (t *transactionService) prepareTransaction(ctx context.Context, request *Tx
 		gasLimit = request.GasLimit
 	}
 
-	/*
-		Transactions are EIP 1559 dynamic transactions where there are three fee related fields:
-			1. base fee is the price that will be burned as part of the transaction.
-			2. max fee is the max price we are willing to spend as gas price.
-			3. max priority fee is max price want to give to the miner to prioritize the transaction.
-		as an example:
-		if base fee is 15, max fee is 20, and max priority is 3, gas price will be 15 + 3 = 18
-		if base is 15, max fee is 20, and max priority fee is 10,
-		gas price will be 15 + 10 = 25, but since 25 > 20, gas price is 20.
-		notice that gas price does not exceed 20 as defined by max fee.
-	*/
-
-	gasFeeCap, gasTipCap, err := t.suggestedFeeAndTip(ctx, request.GasPrice, boostPercent)
-	if err != nil {
-		return nil, err
-	}
+        gasPrice := request.GasPrice
+        if gasPrice == nil {
+                gasPriceSuggested, err := t.backend.SuggestGasPrice(ctx)
+                gasPrice = new(big.Int).Div(new(big.Int).Mul(big.NewInt(int64(boostPercent)+100), gasPriceSuggested), big.NewInt(100))
+                if err != nil {
+                        return nil, err
+                }
+        }
 
 	return types.NewTx(&types.DynamicFeeTx{
 		Nonce:     nonce,
@@ -316,35 +309,8 @@ func (t *transactionService) prepareTransaction(ctx context.Context, request *Tx
 		To:        request.To,
 		Value:     request.Value,
 		Gas:       gasLimit,
-		GasFeeCap: gasFeeCap,
-		GasTipCap: gasTipCap,
 		Data:      request.Data,
 	}), nil
-}
-
-func (t *transactionService) suggestedFeeAndTip(ctx context.Context, gasPrice *big.Int, boostPercent int) (*big.Int, *big.Int, error) {
-	var err error
-
-	if gasPrice == nil {
-		gasPrice, err = t.backend.SuggestGasPrice(ctx)
-		if err != nil {
-			return nil, nil, err
-		}
-		gasPrice = new(big.Int).Div(new(big.Int).Mul(big.NewInt(int64(boostPercent)+100), gasPrice), big.NewInt(100))
-	}
-
-	gasTipCap, err := new(big.Int).SetUint64(2999999993), nil
-	if err != nil {
-		return nil, nil, err
-	}
-
-	gasTipCap = new(big.Int).Div(new(big.Int).Mul(big.NewInt(int64(boostPercent)+100), gasTipCap), big.NewInt(100))
-	gasFeeCap := new(big.Int).Add(gasTipCap, gasPrice)
-
-	t.logger.Debug("prepare transaction", "gas_price", gasPrice, "gas_max_fee", gasFeeCap, "gas_max_tip", gasTipCap)
-
-	return gasFeeCap, gasTipCap, nil
-
 }
 
 func (t *transactionService) nonceKey() string {
@@ -471,7 +437,6 @@ func (t *transactionService) ResendTransaction(ctx context.Context, txHash commo
 		return err
 	}
 
-	gasFeeCap, gasTipCap, err := t.suggestedFeeAndTip(ctx, sctx.GetGasPrice(ctx), storedTransaction.GasTipBoost)
 	if err != nil {
 		return err
 	}
@@ -482,8 +447,6 @@ func (t *transactionService) ResendTransaction(ctx context.Context, txHash commo
 		To:        storedTransaction.To,
 		Value:     storedTransaction.Value,
 		Gas:       storedTransaction.GasLimit,
-		GasTipCap: gasTipCap,
-		GasFeeCap: gasFeeCap,
 		Data:      storedTransaction.Data,
 	})
 
@@ -511,31 +474,12 @@ func (t *transactionService) CancelTransaction(ctx context.Context, originalTxHa
 		return common.Hash{}, err
 	}
 
-	gasFeeCap, gasTipCap, err := t.suggestedFeeAndTip(ctx, sctx.GetGasPrice(ctx), 0)
-	if err != nil {
-		return common.Hash{}, err
-	}
-
-	if gasFeeCap.Cmp(storedTransaction.GasFeeCap) <= 0 {
-		gasFeeCap = storedTransaction.GasFeeCap
-	}
-
-	if gasTipCap.Cmp(storedTransaction.GasTipCap) <= 0 {
-		gasTipCap = storedTransaction.GasTipCap
-	}
-
-	gasTipCap = new(big.Int).Div(new(big.Int).Mul(big.NewInt(int64(10)+100), gasTipCap), big.NewInt(100))
-
-	gasFeeCap.Add(gasFeeCap, gasTipCap)
-
 	signedTx, err := t.signer.SignTx(types.NewTx(&types.DynamicFeeTx{
 		Nonce:     storedTransaction.Nonce,
 		ChainID:   t.chainID,
 		To:        &t.sender,
 		Value:     big.NewInt(0),
 		Gas:       21000,
-		GasTipCap: gasTipCap,
-		GasFeeCap: gasFeeCap,
 		Data:      []byte{},
 	}), t.chainID)
 	if err != nil {
