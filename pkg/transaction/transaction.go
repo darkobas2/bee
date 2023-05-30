@@ -303,12 +303,12 @@ func (t *transactionService) prepareTransaction(ctx context.Context, request *Tx
                 }
         }
 
-	return types.NewTx(&types.DynamicFeeTx{
+	return types.NewTx(&types.LegacyTx{
 		Nonce:     nonce,
-		ChainID:   t.chainID,
 		To:        request.To,
 		Value:     request.Value,
 		Gas:       gasLimit,
+		GasPrice: gasPrice,
 		Data:      request.Data,
 	}), nil
 }
