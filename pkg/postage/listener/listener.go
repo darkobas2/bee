@@ -287,9 +287,11 @@ func (l *listener) Listen(ctx context.Context, from uint64, updater postage.Even
 
 			if to < tailSize {
 				// in a test blockchain there might be not be enough blocks yet
+				l.logger.Warning("not enough blocks", "to", to, "tailSize", tailSize)
 				continue
 			}
 
+                        initialTo := to
 			// consider to-tailSize as the "latest" block we need to sync to
 			to = to - tailSize
 			lastConfirmedBlock = to
@@ -299,6 +301,7 @@ func (l *listener) Listen(ctx context.Context, from uint64, updater postage.Even
 
 			if to < from {
 				// if the blockNumber is actually less than what we already, it might mean the backend is not synced or some reorg scenario
+				 l.logger.Warning("too small block number", "to", to, "from", from, "tailSize", tailSize, "initialTo", initialTo, "batchFactor", batchFactor)
 				continue
 			}
 
