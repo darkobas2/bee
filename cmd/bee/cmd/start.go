@@ -45,7 +45,7 @@ const (
 
 // default values for network IDs
 const (
-	defaultMainNetworkID uint64 = 1
+	defaultMainNetworkID uint64 = 1001
 	defaultTestNetworkID uint64 = 10
 )
 
