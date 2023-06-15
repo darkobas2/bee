@@ -29,7 +29,7 @@ const loggerName = "listener"
 
 const (
 	blockPage          = 5000      // how many blocks to sync every time we page
-	tailSize           = 0         // how many blocks to tail from the tip of the chain
+	tailSize           = 4         // how many blocks to tail from the tip of the chain
 	defaultBatchFactor = uint64(5) // // minimal number of blocks to sync at once
 )
 
@@ -285,13 +285,13 @@ func (l *listener) Listen(ctx context.Context, from uint64, updater postage.Even
 				continue
 			}
 
+			l.logger.Debug("postage listener: got block number", "to", to, "from", from, "tailSize", tailSize, "batchFactor", batchFactor)
+
 			if to < tailSize {
 				// in a test blockchain there might be not be enough blocks yet
-				l.logger.Warning("not enough blocks", "to", to, "tailSize", tailSize)
 				continue
 			}
 
-                        initialTo := to
 			// consider to-tailSize as the "latest" block we need to sync to
 			to = to - tailSize
 			lastConfirmedBlock = to
@@ -299,18 +299,16 @@ func (l *listener) Listen(ctx context.Context, from uint64, updater postage.Even
 			// round down to the largest multiple of batchFactor
 			to = (to / batchFactor) * batchFactor
 
-			if to < from {
-				// if the blockNumber is actually less than what we already, it might mean the backend is not synced or some reorg scenario
-				l.logger.Warning("too small block number", "to", to, "from", from, "tailSize", tailSize, "initialTo", initialTo, "batchFactor", batchFactor)
+			if to <= from { // unblock the channel if there is no activity on the chain
 				closeOnce.Do(func() { synced <- nil })
 				continue
 			}
 
-                        if to < lastConfirmedBlock {
-                                closeOnce.Do(func() { synced <- nil })
-                                continue
-                        }
-
+			if to < from {
+				l.logger.Debug("postage listener: too small block number", "to", to, "from", from, "tailSize", tailSize, "batchFactor", batchFactor)
+				// if the blockNumber is actually less than what we already, it might mean the backend is not synced or some reorg scenario
+				continue
+			}
 
 			// do some paging (sub-optimal)
 			if to-from >= blockPage {
@@ -321,6 +319,7 @@ func (l *listener) Listen(ctx context.Context, from uint64, updater postage.Even
 			}
 			l.metrics.BackendCalls.Inc()
 
+			l.logger.Warning("postage listener: filter events", "to", to, "from", from)
 			events, err := l.ev.FilterLogs(ctx, l.filterQuery(big.NewInt(int64(from)), big.NewInt(int64(to))))
 			if err != nil {
 				l.metrics.BackendErrors.Inc()
