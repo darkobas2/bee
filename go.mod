@@ -7,7 +7,7 @@ require (
 	github.com/btcsuite/btcd v0.22.1
 	github.com/casbin/casbin/v2 v2.35.0
 	github.com/coreos/go-semver v0.3.0
-	github.com/darkobas2/go-storage-incentives-abi v0.5.1
+	github.com/darkobas2/go-storage-incentives-abi v0.5.2-0.20230615220143-06f544f7e971
 	github.com/darkobas2/go-sw3-abi v0.4.2
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/ethersphere/go-price-oracle-abi v0.1.0
