@@ -301,9 +301,16 @@ func (l *listener) Listen(ctx context.Context, from uint64, updater postage.Even
 
 			if to < from {
 				// if the blockNumber is actually less than what we already, it might mean the backend is not synced or some reorg scenario
-				 l.logger.Warning("too small block number", "to", to, "from", from, "tailSize", tailSize, "initialTo", initialTo, "batchFactor", batchFactor)
+				l.logger.Warning("too small block number", "to", to, "from", from, "tailSize", tailSize, "initialTo", initialTo, "batchFactor", batchFactor)
+				closeOnce.Do(func() { synced <- nil })
 				continue
 			}
+
+                        if to < lastConfirmedBlock {
+                                closeOnce.Do(func() { synced <- nil })
+                                continue
+                        }
+
 
 			// do some paging (sub-optimal)
 			if to-from >= blockPage {
