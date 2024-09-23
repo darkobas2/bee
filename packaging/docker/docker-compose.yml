@@ -1,54 +1,85 @@
-version: "3"
+# Base configuration for all services (Bee nodes).
+# Specifies the Docker image to use and sets the restart policy to "unless stopped", meaning
+# the container will always restart unless manually stopped or it crashes repeatedly.
+x-base: &base
+  image: ethersphere/bee:2.2.0
+  restart: unless-stopped
+  command: start
 
+# Common environment variables shared by all nodes.
+# BEE_PASSWORD: Sets the Bee node password (used for keystore access).
+# BEE_CORS_ALLOWED_ORIGINS: Enables Cross-Origin Resource Sharing (CORS) for API access.
+# Here, '*' allows requests from any origin.
+x-common: &common
+    BEE_PASSWORD: "changeme"
+    BEE_CORS_ALLOWED_ORIGINS: '["*"]'
+
+# Configuration for a testnet node.
+# BEE_MAINNET: `false` ensures the node is configured for a testnet, not the mainnet.
+# BEE_NAT_ADDR: Public IP address of the node.
+x-testnet: &testnet
+    BEE_MAINNET: false
+    BEE_BLOCKCHAIN_RPC_ENDPOINT: "https://sepolia.dev.fairdatasociety.org"
+    BEE_BOOTNODE: "/dnsaddr/testnet.ethswarm.org"
+    BEE_NETWORK_ID: "10"
+
+x-mainnet: &mainnet
+    BEE_BLOCKCHAIN_RPC_ENDPOINT: "https://sepolia.dev.fairdatasociety.org"
+
+# Configuration for a full node.
+# BEE_FULL_NODE: `true` means this node will be a full node, storing all network data.
+# BEE_SWAP_ENABLE: `true` enables the SWAP feature, which allows peer-to-peer payments.
+# BEE_BLOCKCHAIN_RPC_ENDPOINT: Defines the RPC endpoint for connecting to the xDai blockchain.
+# BEE_NAT_ADDR: Public IP address of the node. (ie. run curl ifconfig.me on your host and setup nat)
+x-full-node: &full-node
+    BEE_FULL_NODE: true
+    BEE_SWAP_ENABLE: true
+    BEE_NAT_ADDR: "your_public_ip"
+
+# Configuration for a light node.
+# BEE_FULL_NODE: `false` makes this a light node, meaning it will not store all data but still participate in the network.
+# BEE_SWAP_ENABLE: `true` allows SWAP payments on the light node.
+# BEE_BLOCKCHAIN_RPC_ENDPOINT: Defines the RPC endpoint for connecting to the xDai blockchain.
+x-light-node: &light-node
+    BEE_FULL_NODE: false
+    BEE_SWAP_ENABLE: true
+
+# Configuration for an ultra-light node.
+# BEE_FULL_NODE: `false`, meaning this node will not store all network data.
+# BEE_SWAP_ENABLE: `false`, disabling the SWAP feature.
+x-ultra-light-node: &ultra-light-node
+    BEE_FULL_NODE: false
+    BEE_SWAP_ENABLE: false
+
+# Services block defines the Bee nodes (in this case, a single Bee node).
 services:
   bee-1:
-    image: ethersphere/bee:stable
-    restart: unless-stopped
-    environment:
-      - BEE_API_ADDR
-      - BEE_BLOCK_TIME
-      - BEE_BOOTNODE
-      - BEE_BOOTNODE_MODE
-      - BEE_CONFIG
-      - BEE_CORS_ALLOWED_ORIGINS
-      - BEE_DATA_DIR
-      - BEE_CACHE_CAPACITY
-      - BEE_DB_OPEN_FILES_LIMIT
-      - BEE_DB_BLOCK_CACHE_CAPACITY
-      - BEE_DB_WRITE_BUFFER_SIZE
-      - BEE_DB_DISABLE_SEEKS_COMPACTION
-      - BEE_FULL_NODE
-      - BEE_NAT_ADDR
-      - BEE_NETWORK_ID
-      - BEE_P2P_ADDR
-      - BEE_P2P_QUIC_ENABLE
-      - BEE_P2P_WS_ENABLE
-      - BEE_PASSWORD
-      - BEE_PASSWORD_FILE
-      - BEE_PAYMENT_EARLY_PERCENT
-      - BEE_PAYMENT_THRESHOLD
-      - BEE_PAYMENT_TOLERANCE_PERCENT
-      - BEE_POSTAGE_STAMP_ADDRESS
-      - BEE_RESOLVER_OPTIONS
-      - BEE_SWAP_ENABLE
-      - BEE_BLOCKCHAIN_RPC_ENDPOINT
-      - BEE_SWAP_FACTORY_ADDRESS
-      - BEE_SWAP_LEGACY_FACTORY_ADDRESSES
-      - BEE_SWAP_INITIAL_DEPOSIT
-      - BEE_SWAP_DEPLOYMENT_GAS_PRICE
-      - BEE_TRACING_ENABLE
-      - BEE_TRACING_ENDPOINT
-      - BEE_TRACING_SERVICE_NAME
-      - BEE_TRANSACTION
-      - BEE_VERBOSITY
-      - BEE_WELCOME_MESSAGE
-      - BEE_MAINNET
+    <<: *base  # Inherits the base configuration (Docker image, restart policy).
     ports:
-      - "${API_ADDR:-1633}${BEE_API_ADDR:-:1633}"
+      # Mapping ports for API and P2P communication.
+      # API_ADDR is used to expose the Bee node API on a specified address and port.
+      # P2P_ADDR is used to expose the P2P communication port for network interactions.
+      - "${API_ADDR:-127.0.0.1:1633}${BEE_API_ADDR:-:1633}"
       - "${P2P_ADDR:-1634}${BEE_P2P_ADDR:-:1634}"
     volumes:
+      # Maps the bee-1 volume to the node's data directory, ensuring persistence of data across container restarts.
       - bee-1:/home/bee/.bee
-    command: start
+    environment:
+      # This line allows the user to inherit environment variables from multiple sources.
+      # In this example, it combines the environment variables defined under `*common` and `*full-node`.
+      # `*common` includes general settings (like BEE_PASSWORD and CORS origins), which are applicable to all node types.
+      # `*full-node` includes specific settings for a full node, such as enabling SWAP and connecting to the xDai blockchain.
+      # Depending on the use case, the user can change `*full-node` to one of the other anchors defined above:
+      # - `*light-node`: For running a light node that doesn't store all network data but supports SWAP.
+      # - `*ultra-light-node`: For an ultra-light node, which neither stores all data nor supports SWAP.
+      # - `*testnet`: For a node configured to run on test network instead of the mainnet.
+      # - `*mainnet`: For a node configured to run on mainnet.
+      # Example:
+      # - If you want to run a light node, change `*full-node` to `*light-node`.
+      # - For an ultra-light node, use `*ultra-light-node`.
+      << : [*common, *full-node, *mainnet]
 
+# Defines the volume for bee-1 service to store node data persistently.
 volumes:
   bee-1:
+
